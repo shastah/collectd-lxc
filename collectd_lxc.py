@@ -58,7 +58,7 @@ def reader(input_data=None):
                             mem_swap = int(data[1])
 
                     values = collectd.Values(plugin_instance=lxc_fullname,
-                                             type="gauge", plugin="lxc_memory")
+                                             type="memory", plugin="lxc_memory")
                     values.dispatch(type_instance="rss", values=[mem_rss])
                     values.dispatch(type_instance="cache", values=[mem_cache])
                     values.dispatch(type_instance="swap", values=[mem_swap])
@@ -81,7 +81,7 @@ def reader(input_data=None):
                             cpu_system = int(data[1])
 
                     values = collectd.Values(plugin_instance=lxc_fullname,
-                                             type="gauge", plugin="lxc_cpu")
+                                             type="cpu", plugin="lxc_cpu")
                     values.dispatch(type_instance="user", values=[cpu_user])
                     values.dispatch(type_instance="system", values=[cpu_system])
 
