@@ -60,6 +60,45 @@ def get_proc_net_dev_by_task_id(task_id):
         return None
 
 
+def dispatch_network_data(instance_name, network_data):
+    if not network_data:
+        return
+    # HEAD OF /proc/net/dev :
+    # Inter-|Receive                                                |Transmit
+    # face  |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed
+    for line in network_data[2:]:
+        if line.strip() == "":
+            continue
+        interface = line.strip().split(':')[0]
+        rx_data = line.strip().split(':')[1].split()[0:7]
+        tx_data = line.strip().split(':')[1].split()[8:15]
+
+        rx_bytes = int(rx_data[0])
+        tx_bytes = int(tx_data[0])
+
+        rx_packets = int(rx_data[1])
+        tx_packets = int(tx_data[1])
+
+        rx_errors = int(rx_data[2])
+        tx_errors = int(tx_data[2])
+
+        values = collectd.Values(plugin_instance=instance_name,
+                                 type="if_octets", plugin="lxc_net")
+        values.dispatch(type_instance="{0}".format(interface),
+                        values=[rx_bytes, tx_bytes])
+
+        values = collectd.Values(plugin_instance=instance_name,
+                                 type="if_packets", plugin="lxc_net")
+        values.dispatch(type_instance="{0}".format(interface),
+                        values=[rx_packets, tx_packets])
+
+        values = collectd.Values(plugin_instance=instance_name,
+                                 type="if_errors", plugin="lxc_net")
+        values.dispatch(type_instance="{0}".format(interface),
+                        values=[rx_errors, tx_errors])
+    return
+
+
 def reader(input_data=None):
     root_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/lxc/*/")
     unprivilege_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/*/*/*/lxc/*/")
@@ -102,34 +141,7 @@ def reader(input_data=None):
                     processed_network = True
                     task_id = get_task_id_by_cgroup(metric_root)
                     network_data = get_proc_net_dev_by_task_id(task_id)
-                    if network_data:
-                        # HEAD OF /proc/net/dev :
-                        # Inter-|Receive                                                |Transmit
-                        # face  |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed
-                        for line in network_data[2:]:
-                            if line.strip() == "":
-                                continue
-                            interface = line.strip().split(':')[0]
-                            rx_data = line.strip().split(':')[1].split()[0:7]
-                            tx_data = line.strip().split(':')[1].split()[8:15]
-
-                            rx_bytes = int(rx_data[0])
-                            tx_bytes = int(tx_data[0])
-
-                            rx_packets = int(rx_data[1])
-                            tx_packets = int(tx_data[1])
-
-                            rx_errors = int(rx_data[2])
-                            tx_errors = int(tx_data[2])
-
-                            values = collectd.Values(plugin_instance=lxc_fullname,
-                                                             type="gauge", plugin="lxc_net")
-                            values.dispatch(type_instance="tx_bytes_{0}".format(interface), values=[tx_bytes])
-                            values.dispatch(type_instance="rx_bytes_{0}".format(interface), values=[rx_bytes])
-                            values.dispatch(type_instance="tx_packets_{0}".format(interface), values=[tx_packets])
-                            values.dispatch(type_instance="rx_packets_{0}".format(interface), values=[rx_packets])
-                            values.dispatch(type_instance="tx_errors_{0}".format(interface), values=[tx_errors])
-                            values.dispatch(type_instance="rx_errors_{0}".format(interface), values=[rx_errors])
+                    dispatch_network_data(lxc_fullname, network_data)
                 ### End Network
 
                 ### Memory
