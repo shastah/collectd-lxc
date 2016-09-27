@@ -89,25 +89,47 @@ def reader(input_data=None):
 
                 ### DISK
                 if metric == "blkio":
+                    re_templ = lambda kw: re.compile('^ (?P<dev> [0-9:]+ ) \s %s \s (?P<val> [0-9]+ ) $' % kw, flags=re.VERBOSE | re.MULTILINE)
+                    def parse(regexp, s):
+                        d = {}
+                        intify = lambda (dev, val) : (dev, int(val))
+                        d.update(map(intify, regexp.findall(s)))
+                        return d
+                    parse_reads = lambda s : parse(re_templ("Read"), s)
+                    parse_writes = lambda s : parse(re_templ("Write"), s)
 
-                    with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
-                        lines = f.read()
+                    try:
+                        with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
+                            byte_lines = f.read()
+                            all_bytes_read = parse_reads(byte_lines)
+                            all_bytes_write = parse_writes(byte_lines)
+                    except:
+                        continue
 
-                    bytes_read = int(re.search("Read\s+(?P<read>[0-9]+)", lines).group("read"))
-                    bytes_write = int(re.search("Write\s+(?P<write>[0-9]+)", lines).group("write"))
+                    try:
+                        with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
+                            ops_lines = f.read()
+                            all_ops_read = parse_reads(ops_lines)
+                            all_ops_write = parse_writes(ops_lines)
+                    except:
+                        continue
 
-                    with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
-                        lines = f.read()
+                    re_dev = re.compile('^DEVNAME=(?P<devname>.+)$', re.MULTILINE)
 
-                    ops_read = int(re.search("Read\s+(?P<read>[0-9]+)", lines).group("read"))
-                    ops_write = int(re.search("Write\s+(?P<write>[0-9]+)", lines).group("write"))
+                    for k in all_bytes_read:
+                        devname = None
+                        try:
+                            with open('/sys/dev/block/{0}/uevent'.format(k), 'r') as f:
+                                devname = re_dev.search(f.read()).group('devname')
+                                devname = re.sub("[^a-zA-Z0-9]", '_', devname)
+                        except:
+                            continue
 
-                    values = collectd.Values(plugin_instance=lxc_fullname,
-                                             type="gauge", plugin="lxc_blkio")
-                    values.dispatch(type_instance="bytes_read", values=[bytes_read])
-                    values.dispatch(type_instance="bytes_write", values=[bytes_write])
-                    values.dispatch(type_instance="ops_read", values=[ops_read])
-                    values.dispatch(type_instance="ops_write", values=[ops_write])
+                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_octets", plugin="lxc_blkio")
+                        values.dispatch(type_instance="%s" % devname, values=[all_bytes_read[k], all_bytes_write[k]])
+
+                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_ops", plugin="lxc_blkio")
+                        values.dispatch(type_instance="%s" % devname, values=[all_ops_read[k], all_ops_write[k]])
 
                 ### End DISK
 
