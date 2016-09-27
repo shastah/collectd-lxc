@@ -134,8 +134,6 @@ def reader(input_data=None):
                     except:
                         continue
 
-                    re_dev = re.compile('^DEVNAME=(?P<devname>.+)$', re.MULTILINE)
-
                     for k in all_bytes_read:
                         devname = get_blkdev_name(k)
 
