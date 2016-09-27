@@ -12,6 +12,23 @@ def configer(ObjConfiguration):
 def initer():
     collectd.info('initing lxc collectd')
 
+def get_blkdev_name(minmaj):
+    devname = minmaj
+    # Try "friendly" names first, if this is LVM, we might have
+    # vgname-lvname in dm/name
+    try:
+        with open('/sys/dev/block/{0}/dm/name'.format(minmaj), 'r') as f:
+            devname = f.readline().rstrip()
+    except:
+        re_dev = re.compile('^DEVNAME=(?P<devname>.+)$', re.MULTILINE)
+        try:
+            with open('/sys/dev/block/{0}/uevent'.format(minmaj), 'r') as f:
+                devname = re_dev.search(f.read()).group('devname')
+        except:
+            devname = minmaj
+    devname = re.sub("[^a-zA-Z0-9]", '_', devname)
+    return devname
+
 def reader(input_data=None):
     root_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/lxc/*/")
     unprivilege_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/*/*/*/lxc/*/")
@@ -120,13 +137,7 @@ def reader(input_data=None):
                     re_dev = re.compile('^DEVNAME=(?P<devname>.+)$', re.MULTILINE)
 
                     for k in all_bytes_read:
-                        devname = None
-                        try:
-                            with open('/sys/dev/block/{0}/uevent'.format(k), 'r') as f:
-                                devname = re_dev.search(f.read()).group('devname')
-                                devname = re.sub("[^a-zA-Z0-9]", '_', devname)
-                        except:
-                            continue
+                        devname = get_blkdev_name(k)
 
                         values = collectd.Values(plugin_instance=lxc_fullname, type="disk_octets", plugin="lxc_blkio")
                         values.dispatch(type_instance="%s" % devname, values=[all_bytes_read[k], all_bytes_write[k]])
