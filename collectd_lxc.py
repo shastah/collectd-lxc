@@ -88,6 +88,9 @@ def reader(input_data=None):
                 ### End CPU
 
                 ### DISK
+                # write metrics are slightly irrelevant actually, because writes
+                # are only accounted when they are not buffered. So meaningful
+                # results are only obtained for direct/unbuffered IO.
                 if metric == "blkio":
                     re_templ = lambda kw: re.compile('^ (?P<dev> [0-9:]+ ) \s %s \s (?P<val> [0-9]+ ) $' % kw, flags=re.VERBOSE | re.MULTILINE)
                     def parse(regexp, s):
