@@ -6,6 +6,8 @@ import re
 import subprocess
 from nsenter import Namespace
 
+SEPARATOR = '_'
+
 def configer(ObjConfiguration):
     collectd.info('Configuring lxc collectd')
 
@@ -123,7 +125,7 @@ def reader(input_data=None):
     for user_id in metrics:
         # foreach container
         for container_name in metrics[user_id]:
-            lxc_fullname = "{0}__{1}".format(user_id, container_name)
+            lxc_fullname = "{0}{1}{2}".format(user_id, SEPARATOR, container_name)
             processed_network = False
 
             for metric in metrics[user_id][container_name]:
