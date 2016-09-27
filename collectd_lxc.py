@@ -42,6 +42,7 @@ def get_task_id_by_cgroup(cgroup_path):
                 return task_id
         except:
             continue
+    collectd.debug("cannot get task_id from cgroup path {0}".format(cgroup_path))
     return None
 
 
@@ -55,6 +56,7 @@ def get_proc_net_dev_by_task_id(task_id):
             network_data = subprocess.check_output(['cat', '/proc/net/dev'])
             return network_data.split('\n')
     except:
+        collectd.debug("cannot get /proc/net/dev from netns for pid {0}".format(task_id))
         return None
 
 
@@ -198,6 +200,8 @@ def reader(input_data=None):
                             all_bytes_read = parse_reads(byte_lines)
                             all_bytes_write = parse_writes(byte_lines)
                     except:
+                        collectd.debug("cannot parse {0}/{1}".format(metric_root,
+                                                'blkio.throttle.io_service_bytes'))
                         continue
 
                     try:
@@ -206,6 +210,8 @@ def reader(input_data=None):
                             all_ops_read = parse_reads(ops_lines)
                             all_ops_write = parse_writes(ops_lines)
                     except:
+                        collectd.debug("cannot parse {0}/{1}".format(metric_root,
+                                                'blkio.throttle.io_serviced'))
                         continue
 
                     for k in all_bytes_read:
