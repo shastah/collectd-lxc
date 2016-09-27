@@ -62,9 +62,14 @@ def get_proc_net_dev_by_task_id(task_id):
         return None
 
 
+def plugin_name(name):
+    return 'lxc{0}{1}'.format(SEPARATOR, name)
+
+
 def dispatch_network_data(instance_name, network_data):
     if not network_data:
         return
+    plugin = plugin_name("net")
     # HEAD OF /proc/net/dev :
     # Inter-|Receive                                                |Transmit
     # face  |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed
@@ -85,17 +90,17 @@ def dispatch_network_data(instance_name, network_data):
         tx_errors = int(tx_data[2])
 
         values = collectd.Values(plugin_instance=instance_name,
-                                 type="if_octets", plugin="lxc_net")
+                                 type="if_octets", plugin=plugin)
         values.dispatch(type_instance="{0}".format(interface),
                         values=[rx_bytes, tx_bytes])
 
         values = collectd.Values(plugin_instance=instance_name,
-                                 type="if_packets", plugin="lxc_net")
+                                 type="if_packets", plugin=plugin)
         values.dispatch(type_instance="{0}".format(interface),
                         values=[rx_packets, tx_packets])
 
         values = collectd.Values(plugin_instance=instance_name,
-                                 type="if_errors", plugin="lxc_net")
+                                 type="if_errors", plugin=plugin)
         values.dispatch(type_instance="{0}".format(interface),
                         values=[rx_errors, tx_errors])
     return
@@ -164,8 +169,9 @@ def reader(input_data=None):
                         elif data[0] == "total_swap":
                             mem_swap = int(data[1])
 
+                    plugin = plugin_name("memory")
                     values = collectd.Values(plugin_instance=lxc_fullname,
-                                             type="memory", plugin="lxc_memory")
+                                             type="memory", plugin=plugin)
                     values.dispatch(type_instance="rss", values=[mem_rss])
                     values.dispatch(type_instance="cache", values=[mem_cache])
                     values.dispatch(type_instance="swap", values=[mem_swap])
@@ -187,8 +193,9 @@ def reader(input_data=None):
                         elif data[0] == "system":
                             cpu_system = int(data[1])
 
+                    plugin = plugin_name("cpu")
                     values = collectd.Values(plugin_instance=lxc_fullname,
-                                             type="cpu", plugin="lxc_cpu")
+                                             type="cpu", plugin=plugin)
                     values.dispatch(type_instance="user", values=[cpu_user])
                     values.dispatch(type_instance="system", values=[cpu_system])
 
@@ -228,13 +235,14 @@ def reader(input_data=None):
                                                 'blkio.throttle.io_serviced'))
                         continue
 
+                    plugin = plugin_name("blkio")
                     for k in all_bytes_read:
                         devname = get_blkdev_name(k)
 
-                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_octets", plugin="lxc_blkio")
+                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_octets", plugin=plugin)
                         values.dispatch(type_instance="%s" % devname, values=[all_bytes_read[k], all_bytes_write[k]])
 
-                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_ops", plugin="lxc_blkio")
+                        values = collectd.Values(plugin_instance=lxc_fullname, type="disk_ops", plugin=plugin)
                         values.dispatch(type_instance="%s" % devname, values=[all_ops_read[k], all_ops_write[k]])
 
                 ### End DISK
