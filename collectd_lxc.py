@@ -38,9 +38,10 @@ def reader(input_data=None):
         for container_name in metrics[user_id]:
             lxc_fullname = "{0}__{1}".format(user_id, container_name)
             for metric in metrics[user_id][container_name]:
+                metric_root = metrics[user_id][container_name][metric]
                 ### Memory
                 if metric == "memory":
-                    with open(os.path.join(metrics[user_id][container_name][metric], 'memory.stat'), 'r') as f:
+                    with open(os.path.join(metric_root, 'memory.stat'), 'r') as f:
                         lines = f.read().splitlines()
 
                     mem_rss = 0
@@ -66,7 +67,7 @@ def reader(input_data=None):
 
                 ### CPU
                 if metric == "cpuacct":
-                    with open(os.path.join(metrics[user_id][container_name][metric], 'cpuacct.stat'), 'r') as f:
+                    with open(os.path.join(metric_root, 'cpuacct.stat'), 'r') as f:
                         lines = f.read().splitlines()
 
                     cpu_user = 0
@@ -89,13 +90,13 @@ def reader(input_data=None):
                 ### DISK
                 if metric == "blkio":
 
-                    with open(os.path.join(metrics[user_id][container_name][metric], 'blkio.throttle.io_service_bytes'), 'r') as f:
+                    with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
                         lines = f.read()
 
                     bytes_read = int(re.search("Read\s+(?P<read>[0-9]+)", lines).group("read"))
                     bytes_write = int(re.search("Write\s+(?P<write>[0-9]+)", lines).group("write"))
 
-                    with open(os.path.join(metrics[user_id][container_name][metric], 'blkio.throttle.io_serviced'), 'r') as f:
+                    with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
                         lines = f.read()
 
                     ops_read = int(re.search("Read\s+(?P<read>[0-9]+)", lines).group("read"))
@@ -112,7 +113,7 @@ def reader(input_data=None):
 
                 ### Network
                     #PID lxc: cat /sys/fs/cgroup/devices/lxc/CONTAINER-NAME/tasks | head -n 1
-                    with open(os.path.join(metrics[user_id][container_name][metric], 'init.scope/tasks'), 'r') as f:
+                    with open(os.path.join(metric_root, 'init.scope/tasks'), 'r') as f:
                         # The first line is PID of container
                         container_PID = f.readline().rstrip()
                         with Namespace(container_PID, 'net'):
