@@ -21,6 +21,7 @@ LoadPlugin python
     Interactive false
     Import "collectd_lxc"
     <Module collectd_lxc>
+        Separator "_"
     </Module>
 </Plugin>
 ````

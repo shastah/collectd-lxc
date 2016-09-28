@@ -8,8 +8,14 @@ from nsenter import Namespace
 
 SEPARATOR = '_'
 
-def configer(ObjConfiguration):
-    collectd.info('Configuring lxc collectd')
+def configer(cfg):
+    collectd.info('Configuring lxc plugin')
+    for node in cfg.children:
+        k = node.key.lower()
+        v = node.values
+        if k == 'separator':
+            global SEPARATOR
+            SEPARATOR = v[0]
 
 def initer():
     collectd.info('initing lxc collectd')
