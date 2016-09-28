@@ -22,6 +22,7 @@ LoadPlugin python
     Import "collectd_lxc"
     <Module collectd_lxc>
         Separator "_"
+        DSname "lxc" "%USERID%" "%CONTAINER%"
     </Module>
 </Plugin>
 ````
