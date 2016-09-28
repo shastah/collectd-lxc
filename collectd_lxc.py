@@ -7,6 +7,7 @@ import subprocess
 from nsenter import Namespace
 
 SEPARATOR = '_'
+DS_NAME = ('lxc', '%USERID%', '%CONTAINER%')
 
 def configer(cfg):
     collectd.info('Configuring lxc plugin')
@@ -16,6 +17,9 @@ def configer(cfg):
         if k == 'separator':
             global SEPARATOR
             SEPARATOR = v[0]
+        elif k == 'dsname':
+            global DS_NAME
+            DS_NAME = v
 
 def initer():
     collectd.info('initing lxc collectd')
@@ -66,6 +70,18 @@ def get_proc_net_dev_by_task_id(task_id):
     except:
         collectd.debug("cannot get /proc/net/dev from netns for pid {0}".format(task_id))
         return None
+
+
+def get_ds_name(user_id, container_name):
+    ds = []
+    for s in DS_NAME:
+        if s == '%USERID%':
+            ds.append('{0}'.format(user_id))
+        elif s == '%CONTAINER%':
+            ds.append(container_name)
+        else:
+            ds.append(str(s))
+    return SEPARATOR.join(ds)
 
 
 def plugin_name(name):
