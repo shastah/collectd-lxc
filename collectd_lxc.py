@@ -6,20 +6,21 @@ import re
 import subprocess
 from nsenter import Namespace
 
-SEPARATOR = '_'
-DS_NAME = ('lxc', '%USERID%', '%CONTAINER%')
+CONFIG = { 'separator': '_',
+           'dsname': ('lxc', '%USERID%', '%CONTAINER%'),
+         }
+
 
 def configer(cfg):
     collectd.info('Configuring lxc plugin')
+    global CONFIG
     for node in cfg.children:
         k = node.key.lower()
         v = node.values
         if k == 'separator':
-            global SEPARATOR
-            SEPARATOR = v[0]
+            CONFIG[k] = v[0]
         elif k == 'dsname':
-            global DS_NAME
-            DS_NAME = v
+            CONFIG[k] = v
 
 def initer():
     collectd.info('initing lxc collectd')
@@ -74,14 +75,14 @@ def get_proc_net_dev_by_task_id(task_id):
 
 def get_ds_name(user_id, container_name):
     ds = []
-    for s in DS_NAME:
+    for s in CONFIG['dsname']:
         if s == '%USERID%':
             ds.append('{0}'.format(user_id))
         elif s == '%CONTAINER%':
             ds.append(container_name)
         else:
             ds.append(str(s))
-    return SEPARATOR.join(ds)
+    return CONFIG['separator'].join(ds)
 
 
 def dispatch_network_data(dsn, network_data):
