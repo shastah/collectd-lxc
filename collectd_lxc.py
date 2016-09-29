@@ -188,6 +188,48 @@ def collect_memory(metric_root, dsn):
     values.dispatch(type_instance="swap", values=[mem_swap])
 
 
+def collect_blkio(metric_root, dsn):
+    rgxp = '^ (?P<dev> [0-9:]+ ) \s {0} \s (?P<val> [0-9]+ ) $'
+    re_templ = lambda kw: re.compile(rgxp.format(kw), flags=re.VERBOSE | re.MULTILINE)
+    def parse(regexp, s):
+        d = {}
+        intify = lambda (dev, val) : (dev, int(val))
+        d.update(map(intify, regexp.findall(s)))
+        return d
+    parse_reads = lambda s : parse(re_templ("Read"), s)
+    parse_writes = lambda s : parse(re_templ("Write"), s)
+    # write metrics are slightly irrelevant actually, because writes
+    # are only accounted when they are not buffered. So meaningful
+    # results are only obtained for direct/unbuffered IO.
+    try:
+        with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
+            byte_lines = f.read()
+            all_bytes_read = parse_reads(byte_lines)
+            all_bytes_write = parse_writes(byte_lines)
+        for k in all_bytes_read:
+            devname = get_blkdev_name(k)
+            values = collectd.Values(plugin_instance="blkio", type="disk_octets", plugin=dsn)
+            values.dispatch(type_instance=devname, values=[all_bytes_read[k], all_bytes_write[k]])
+    except:
+        collectd.debug("cannot parse {0}/{1}".format(metric_root,
+                                'blkio.throttle.io_service_bytes'))
+        pass
+
+    try:
+        with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
+            ops_lines = f.read()
+            all_ops_read = parse_reads(ops_lines)
+            all_ops_write = parse_writes(ops_lines)
+        for k in all_bytes_read:
+            devname = get_blkdev_name(k)
+            values = collectd.Values(plugin_instance="blkio", type="disk_ops", plugin=dsn)
+            values.dispatch(type_instance=devname, values=[all_ops_read[k], all_ops_write[k]])
+    except:
+        collectd.debug("cannot parse {0}/{1}".format(metric_root,
+                                'blkio.throttle.io_serviced'))
+        pass
+
+
 def read_callback(input_data=None):
     # Avoid doing expensive stuff below if there's nothing to collect
     if not collect_anything():
@@ -248,49 +290,8 @@ def read_callback(input_data=None):
                 ### End CPU
 
                 ### DISK
-                # write metrics are slightly irrelevant actually, because writes
-                # are only accounted when they are not buffered. So meaningful
-                # results are only obtained for direct/unbuffered IO.
                 if metric == "blkio" and CONFIG['collectblkio']:
-                    re_templ = lambda kw: re.compile('^ (?P<dev> [0-9:]+ ) \s %s \s (?P<val> [0-9]+ ) $' % kw, flags=re.VERBOSE | re.MULTILINE)
-                    def parse(regexp, s):
-                        d = {}
-                        intify = lambda (dev, val) : (dev, int(val))
-                        d.update(map(intify, regexp.findall(s)))
-                        return d
-                    parse_reads = lambda s : parse(re_templ("Read"), s)
-                    parse_writes = lambda s : parse(re_templ("Write"), s)
-
-                    try:
-                        with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
-                            byte_lines = f.read()
-                            all_bytes_read = parse_reads(byte_lines)
-                            all_bytes_write = parse_writes(byte_lines)
-                        for k in all_bytes_read:
-                            devname = get_blkdev_name(k)
-                            values = collectd.Values(plugin_instance="blkio", type="disk_octets", plugin=dsn)
-                            values.dispatch(type_instance=devname, values=[all_bytes_read[k], all_bytes_write[k]])
-                    except:
-                        collectd.debug("cannot parse {0}/{1}".format(metric_root,
-                                                'blkio.throttle.io_service_bytes'))
-                        pass
-
-                    try:
-                        with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
-                            ops_lines = f.read()
-                            all_ops_read = parse_reads(ops_lines)
-                            all_ops_write = parse_writes(ops_lines)
-                        for k in all_bytes_read:
-                            devname = get_blkdev_name(k)
-                            values = collectd.Values(plugin_instance="blkio", type="disk_ops", plugin=dsn)
-                            values.dispatch(type_instance=devname, values=[all_ops_read[k], all_ops_write[k]])
-                    except:
-                        collectd.debug("cannot parse {0}/{1}".format(metric_root,
-                                                'blkio.throttle.io_serviced'))
-                        pass
-
-
-
+                    collect_blkio(metric_root, dsn)
                 ### End DISK
 
 
