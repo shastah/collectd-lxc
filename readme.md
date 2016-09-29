@@ -23,6 +23,10 @@ LoadPlugin python
     <Module collectd_lxc>
         Separator "_"
         DSname "lxc" "%USERID%" "%CONTAINER%"
+        CollectBlkio true
+        CollectCpu true
+        CollectMemory true
+        CollectNet true
     </Module>
 </Plugin>
 ````

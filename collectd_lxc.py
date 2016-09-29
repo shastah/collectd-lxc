@@ -8,6 +8,10 @@ from nsenter import Namespace
 
 CONFIG = { 'separator': '_',
            'dsname': ('lxc', '%USERID%', '%CONTAINER%'),
+           'collectblkio': True,
+           'collectcpu': True,
+           'collectmemory': True,
+           'collectnet': True,
          }
 
 
@@ -21,9 +25,29 @@ def configer(cfg):
             CONFIG[k] = v[0]
         elif k == 'dsname':
             CONFIG[k] = v
+        elif k in ['collectblkio', 'collectcpu',
+                   'collectmemory', 'collectnet']:
+            CONFIG[k] = str_to_bool(v[0])
+    for k in CONFIG:
+        collectd.debug("Config: {0} = {1}".format(k, str(CONFIG[k])))
+
 
 def initer():
     collectd.info('initing lxc collectd')
+
+
+def str_to_bool(s):
+    if s and s.lower() in ['true', '1', 'yes']:
+        return True
+    else:
+        return False
+
+
+def collect_anything():
+    '''Returns True if at least one metric is to be collected'''
+    m = ['collectblkio', 'collectcpu', 'collectmemory', 'collectnet']
+    return sum([CONFIG[item] for item in m]) > 0
+
 
 def get_blkdev_name(minmaj):
     devname = minmaj
@@ -122,6 +146,10 @@ def dispatch_network_data(dsn, network_data):
 
 
 def reader(input_data=None):
+    # Avoid doing expensive stuff below if there's nothing to collect
+    if not collect_anything():
+        return
+
     root_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/lxc/*/")
     unprivilege_lxc_cgroup = glob.glob("/sys/fs/cgroup/*/*/*/*/lxc/*/")
 
@@ -158,7 +186,7 @@ def reader(input_data=None):
                 # happens to be the first one;
                 # don't do it after other cgroups, because some of them
                 # do "continue" on errors, which would skip networking
-                if not processed_network:
+                if not processed_network and CONFIG['collectnet']:
                     # we should only do it once per container
                     processed_network = True
                     task_id = get_task_id_by_cgroup(metric_root)
@@ -167,7 +195,7 @@ def reader(input_data=None):
                 ### End Network
 
                 ### Memory
-                if metric == "memory":
+                if metric == "memory" and CONFIG['collectmemory']:
                     with open(os.path.join(metric_root, 'memory.stat'), 'r') as f:
                         lines = f.read().splitlines()
 
@@ -193,7 +221,7 @@ def reader(input_data=None):
                 ### End Memory
 
                 ### CPU
-                if metric == "cpuacct":
+                if metric == "cpuacct" and CONFIG['collectcpu']:
                     with open(os.path.join(metric_root, 'cpuacct.stat'), 'r') as f:
                         lines = f.read().splitlines()
 
@@ -218,7 +246,7 @@ def reader(input_data=None):
                 # write metrics are slightly irrelevant actually, because writes
                 # are only accounted when they are not buffered. So meaningful
                 # results are only obtained for direct/unbuffered IO.
-                if metric == "blkio":
+                if metric == "blkio" and CONFIG['collectblkio']:
                     re_templ = lambda kw: re.compile('^ (?P<dev> [0-9:]+ ) \s %s \s (?P<val> [0-9]+ ) $' % kw, flags=re.VERBOSE | re.MULTILINE)
                     def parse(regexp, s):
                         d = {}
