@@ -254,9 +254,7 @@ def read_callback(input_data=None):
             metrics[user_id][container_name] = dict()
         metrics[user_id][container_name][stat_type] = cgroup_lxc_metrics
 
-    # foreach user
     for user_id in metrics:
-        # foreach container
         for container_name in metrics[user_id]:
             dsn = get_ds_name(user_id, container_name)
             processed_network = False
@@ -264,36 +262,25 @@ def read_callback(input_data=None):
             for metric in metrics[user_id][container_name]:
                 metric_root = metrics[user_id][container_name][metric]
 
-                ### Network
                 # there is no separate cgroup for network (the way we're
                 # interested in it), but we need container->PID mapping,
                 # so we will reuse metric_root of whatever metric that
                 # happens to be the first one;
-                # don't do it after other cgroups, because some of them
-                # do "continue" on errors, which would skip networking
                 if not processed_network and CONFIG['collectnet']:
                     # we should only do it once per container
                     processed_network = True
                     task_id = get_task_id_by_cgroup(metric_root)
                     network_data = get_proc_net_dev_by_task_id(task_id)
                     dispatch_network_data(dsn, network_data)
-                ### End Network
 
-                ### Memory
                 if metric == "memory" and CONFIG['collectmemory']:
                     collect_memory(metric_root, dsn)
-                ### End Memory
 
-                ### CPU
                 if metric == "cpuacct" and CONFIG['collectcpu']:
                     collect_cpu(metric_root, dsn)
-                ### End CPU
 
-                ### DISK
                 if metric == "blkio" and CONFIG['collectblkio']:
                     collect_blkio(metric_root, dsn)
-                ### End DISK
-
 
 
 if __name__ == '__main__':
