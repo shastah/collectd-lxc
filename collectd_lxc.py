@@ -164,6 +164,30 @@ def collect_cpu(metric_root, dsn):
     values.dispatch(type_instance="system", values=[cpu_system])
 
 
+def collect_memory(metric_root, dsn):
+    with open(os.path.join(metric_root, 'memory.stat'), 'r') as f:
+        lines = f.read().splitlines()
+
+    mem_rss = 0
+    mem_cache = 0
+    mem_swap = 0
+
+    for line in lines:
+        data = line.split()
+        if data[0] == "total_rss":
+            mem_rss = int(data[1])
+        elif data[0] == "total_cache":
+            mem_cache = int(data[1])
+        elif data[0] == "total_swap":
+            mem_swap = int(data[1])
+
+    values = collectd.Values(plugin_instance="memory", type="memory",
+                             plugin=dsn)
+    values.dispatch(type_instance="rss", values=[mem_rss])
+    values.dispatch(type_instance="cache", values=[mem_cache])
+    values.dispatch(type_instance="swap", values=[mem_swap])
+
+
 def read_callback(input_data=None):
     # Avoid doing expensive stuff below if there's nothing to collect
     if not collect_anything():
@@ -215,28 +239,7 @@ def read_callback(input_data=None):
 
                 ### Memory
                 if metric == "memory" and CONFIG['collectmemory']:
-                    with open(os.path.join(metric_root, 'memory.stat'), 'r') as f:
-                        lines = f.read().splitlines()
-
-                    mem_rss = 0
-                    mem_cache = 0
-                    mem_swap = 0
-
-                    for line in lines:
-                        data = line.split()
-                        if data[0] == "total_rss":
-                            mem_rss = int(data[1])
-                        elif data[0] == "total_cache":
-                            mem_cache = int(data[1])
-                        elif data[0] == "total_swap":
-                            mem_swap = int(data[1])
-
-                    values = collectd.Values(plugin_instance="memory",
-                                             type="memory", plugin=dsn)
-                    values.dispatch(type_instance="rss", values=[mem_rss])
-                    values.dispatch(type_instance="cache", values=[mem_cache])
-                    values.dispatch(type_instance="swap", values=[mem_swap])
-
+                    collect_memory(metric_root, dsn)
                 ### End Memory
 
                 ### CPU
