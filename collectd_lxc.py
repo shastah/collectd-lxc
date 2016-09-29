@@ -145,6 +145,25 @@ def dispatch_network_data(dsn, network_data):
     return
 
 
+def collect_cpu(metric_root, dsn):
+    with open(os.path.join(metric_root, 'cpuacct.stat'), 'r') as f:
+        lines = f.read().splitlines()
+
+    cpu_user = 0
+    cpu_system = 0
+
+    for line in lines:
+        data = line.split()
+        if data[0] == "user":
+            cpu_user = int(data[1])
+        elif data[0] == "system":
+            cpu_system = int(data[1])
+
+    values = collectd.Values(plugin_instance="cpu", type="cpu", plugin=dsn)
+    values.dispatch(type_instance="user", values=[cpu_user])
+    values.dispatch(type_instance="system", values=[cpu_system])
+
+
 def read_callback(input_data=None):
     # Avoid doing expensive stuff below if there's nothing to collect
     if not collect_anything():
@@ -222,24 +241,7 @@ def read_callback(input_data=None):
 
                 ### CPU
                 if metric == "cpuacct" and CONFIG['collectcpu']:
-                    with open(os.path.join(metric_root, 'cpuacct.stat'), 'r') as f:
-                        lines = f.read().splitlines()
-
-                    cpu_user = 0
-                    cpu_system = 0
-
-                    for line in lines:
-                        data = line.split()
-                        if data[0] == "user":
-                            cpu_user = int(data[1])
-                        elif data[0] == "system":
-                            cpu_system = int(data[1])
-
-                    values = collectd.Values(plugin_instance="cpu",
-                                             type="cpu", plugin=dsn)
-                    values.dispatch(type_instance="user", values=[cpu_user])
-                    values.dispatch(type_instance="system", values=[cpu_system])
-
+                    collect_cpu(metric_root, dsn)
                 ### End CPU
 
                 ### DISK
