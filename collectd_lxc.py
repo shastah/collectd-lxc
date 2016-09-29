@@ -109,7 +109,9 @@ def get_ds_name(user_id, container_name):
     return CONFIG['separator'].join(ds)
 
 
-def dispatch_network_data(dsn, network_data):
+def collect_net(metric_root, dsn):
+    task_id = get_task_id_by_cgroup(metric_root)
+    network_data = get_proc_net_dev_by_task_id(task_id)
     if not network_data:
         return
     # HEAD OF /proc/net/dev :
@@ -269,9 +271,7 @@ def read_callback(input_data=None):
                 if not processed_network and CONFIG['collectnet']:
                     # we should only do it once per container
                     processed_network = True
-                    task_id = get_task_id_by_cgroup(metric_root)
-                    network_data = get_proc_net_dev_by_task_id(task_id)
-                    dispatch_network_data(dsn, network_data)
+                    collect_net(metric_root, dsn)
 
                 if metric == "memory" and CONFIG['collectmemory']:
                     collect_memory(metric_root, dsn)
