@@ -6,50 +6,51 @@ import re
 import subprocess
 from nsenter import Namespace
 
-CONFIG = { 'separator': '_',
-           'dsname': ('lxc', '%USERID%', '%CONTAINER%'),
-           'collectblkio': True,
-           'collectcpu': True,
-           'collectmemory': True,
-           'collectnet': True,
-         }
+CONFIG = {'separator': '_',
+          'dsname': ('lxc', '%USERID%', '%CONTAINER%'),
+          'collectblkio': True,
+          'collectcpu': True,
+          'collectmemory': True,
+          'collectnet': True, }
 
 
 def config_callback(cfg):
+    '''Used as callback when collectd configures plugins'''
     collectd.info('Configuring lxc plugin')
     global CONFIG
     for node in cfg.children:
-        k = node.key.lower()
-        v = node.values
-        if k == 'separator':
-            CONFIG[k] = v[0]
-        elif k == 'dsname':
-            CONFIG[k] = v
-        elif k in ['collectblkio', 'collectcpu',
-                   'collectmemory', 'collectnet']:
-            CONFIG[k] = str_to_bool(v[0])
-    for k in CONFIG:
-        collectd.debug("Config: {0} = {1}".format(k, str(CONFIG[k])))
+        key = node.key.lower()
+        val = node.values
+        if key == 'separator':
+            CONFIG[key] = val[0]
+        elif key == 'dsname':
+            CONFIG[key] = val
+        elif key in ['collectblkio', 'collectcpu',
+                     'collectmemory', 'collectnet']:
+            CONFIG[key] = str_to_bool(val[0])
+    for key in CONFIG:
+        collectd.debug("Config: {0} = {1}".format(key, str(CONFIG[key])))
 
 
 def init_callback():
+    '''Used as callback when collectd initializes this plugin'''
     collectd.info('Initializing lxc plugin')
 
 
-def str_to_bool(s):
-    if s and s.lower() in ['true', '1', 'yes']:
-        return True
-    else:
-        return False
+def str_to_bool(string):
+    '''Convert string to boolean'''
+    truevals = ['true', '1', 'yes']
+    return (string is not None and string.lower() in truevals)
 
 
 def collect_anything():
-    '''Returns True if at least one metric is to be collected'''
-    m = ['collectblkio', 'collectcpu', 'collectmemory', 'collectnet']
-    return sum([CONFIG[item] for item in m]) > 0
+    '''Return True if at least one metric is to be collected'''
+    items = ['collectblkio', 'collectcpu', 'collectmemory', 'collectnet']
+    return sum([CONFIG[item] for item in items]) > 0
 
 
 def get_blkdev_name(minmaj):
+    '''Given major:minor device, return a name as friendly as possible'''
     devname = minmaj
     # Try "friendly" names first, if this is LVM, we might have
     # vgname-lvname in dm/name
@@ -68,6 +69,7 @@ def get_blkdev_name(minmaj):
 
 
 def get_task_id_by_cgroup(cgroup_path):
+    '''Return first ID from /tasks or /init.scope/tasks'''
     tasks_paths = []
     tasks_paths.append(os.path.join(cgroup_path, 'tasks'))
     tasks_paths.append(os.path.join(cgroup_path, 'init.scope', 'tasks'))
@@ -79,11 +81,13 @@ def get_task_id_by_cgroup(cgroup_path):
                 return task_id
         except:
             continue
-    collectd.debug("cannot get task_id from cgroup path {0}".format(cgroup_path))
+    collectd.debug("cannot get task_id " +
+                   "from cgroup path {0}".format(cgroup_path))
     return None
 
 
 def get_proc_net_dev_by_task_id(task_id):
+    '''Get /proc/net/dev contents from inside a container via its net ns'''
     if not task_id:
         return None
     try:
@@ -93,24 +97,26 @@ def get_proc_net_dev_by_task_id(task_id):
             network_data = subprocess.check_output(['cat', '/proc/net/dev'])
             return network_data.split('\n')
     except:
-        collectd.debug("cannot get /proc/net/dev " + \
+        collectd.debug("cannot get /proc/net/dev " +
                        "from netns for pid {0}".format(task_id))
         return None
 
 
 def get_ds_name(user_id, container_name):
-    ds = []
-    for s in CONFIG['dsname']:
-        if s == '%USERID%':
-            ds.append('{0}'.format(user_id))
-        elif s == '%CONTAINER%':
-            ds.append(container_name)
+    '''Build data source name based on configured template'''
+    dscomponents = []
+    for string in CONFIG['dsname']:
+        if string == '%USERID%':
+            dscomponents.append('{0}'.format(user_id))
+        elif string == '%CONTAINER%':
+            dscomponents.append(container_name)
         else:
-            ds.append(str(s))
-    return CONFIG['separator'].join(ds)
+            dscomponents.append(str(string))
+    return CONFIG['separator'].join(dscomponents)
 
 
 def collect_net(metric_root, dsn):
+    '''Collect network stats and dispatch them'''
     task_id = get_task_id_by_cgroup(metric_root)
     network_data = get_proc_net_dev_by_task_id(task_id)
     if not network_data:
@@ -134,21 +140,22 @@ def collect_net(metric_root, dsn):
         rx_errors = int(rx_data[2])
         tx_errors = int(tx_data[2])
 
-        v = collectd.Values(plugin_instance="net", type="if_octets",
+        values = collectd.Values(plugin_instance="net", type="if_octets",
                                  plugin=dsn)
-        v.dispatch(type_instance=iface, values=[rx_bytes, tx_bytes])
+        values.dispatch(type_instance=iface, values=[rx_bytes, tx_bytes])
 
-        v = collectd.Values(plugin_instance="net", type="if_packets",
+        values = collectd.Values(plugin_instance="net", type="if_packets",
                                  plugin=dsn)
-        v.dispatch(type_instance=iface, values=[rx_packets, tx_packets])
+        values.dispatch(type_instance=iface, values=[rx_packets, tx_packets])
 
-        v = collectd.Values(plugin_instance="net", type="if_errors",
+        values = collectd.Values(plugin_instance="net", type="if_errors",
                                  plugin=dsn)
-        v.dispatch(type_instance=iface, values=[rx_errors, tx_errors])
+        values.dispatch(type_instance=iface, values=[rx_errors, tx_errors])
     return
 
 
 def collect_cpu(metric_root, dsn):
+    '''Collect CPU stats and dispatch them'''
     srcfile = os.path.join(metric_root, 'cpuacct.stat')
     with open(srcfile, 'r') as f:
         lines = f.read().splitlines()
@@ -163,12 +170,13 @@ def collect_cpu(metric_root, dsn):
         elif data[0] == "system":
             cpu_system = int(data[1])
 
-    v = collectd.Values(plugin_instance="cpu", type="cpu", plugin=dsn)
-    v.dispatch(type_instance="user", values=[cpu_user])
-    v.dispatch(type_instance="system", values=[cpu_system])
+    values = collectd.Values(plugin_instance="cpu", type="cpu", plugin=dsn)
+    values.dispatch(type_instance="user", values=[cpu_user])
+    values.dispatch(type_instance="system", values=[cpu_system])
 
 
 def collect_memory(metric_root, dsn):
+    '''Collect memory stats and dispatch them'''
     srcfile = os.path.join(metric_root, 'memory.stat')
     with open(srcfile, 'r') as f:
         lines = f.read().splitlines()
@@ -186,23 +194,25 @@ def collect_memory(metric_root, dsn):
         elif data[0] == "total_swap":
             mem_swap = int(data[1])
 
-    v = collectd.Values(plugin_instance="memory", type="memory", plugin=dsn)
-    v.dispatch(type_instance="rss", values=[mem_rss])
-    v.dispatch(type_instance="cache", values=[mem_cache])
-    v.dispatch(type_instance="swap", values=[mem_swap])
+    values = collectd.Values(plugin_instance="memory", type="memory",
+                             plugin=dsn)
+    values.dispatch(type_instance="rss", values=[mem_rss])
+    values.dispatch(type_instance="cache", values=[mem_cache])
+    values.dispatch(type_instance="swap", values=[mem_swap])
 
 
 def collect_blkio(metric_root, dsn):
-    rgxp = '^ (?P<dev> [0-9:]+ ) \s {0} \s (?P<val> [0-9]+ ) $'
+    '''Collect blkio stats and dispatch them'''
+    rgxp = r'^ (?P<dev> [0-9:]+ ) \s {0} \s (?P<val> [0-9]+ ) $'
     re_templ = lambda kw: re.compile(rgxp.format(kw),
                                      flags=re.VERBOSE | re.MULTILINE)
     def parse(regexp, s):
         d = {}
-        intify = lambda (dev, val) : (dev, int(val))
+        intify = lambda (dev, val): (dev, int(val))
         d.update(map(intify, regexp.findall(s)))
         return d
-    parse_reads = lambda s : parse(re_templ("Read"), s)
-    parse_writes = lambda s : parse(re_templ("Write"), s)
+    parse_reads = lambda s: parse(re_templ("Read"), s)
+    parse_writes = lambda s: parse(re_templ("Write"), s)
     # write metrics are slightly irrelevant actually, because writes
     # are only accounted when they are not buffered. So meaningful
     # results are only obtained for direct/unbuffered IO.
@@ -214,10 +224,11 @@ def collect_blkio(metric_root, dsn):
             all_bytes_write = parse_writes(byte_lines)
         for k in all_bytes_read:
             devname = get_blkdev_name(k)
-            v = collectd.Values(plugin_instance="blkio", type="disk_octets",
-                                plugin=dsn)
-            v.dispatch(type_instance=devname,
-                       values=[all_bytes_read[k], all_bytes_write[k]])
+            values = collectd.Values(plugin_instance="blkio",
+                                     type="disk_octets",
+                                     plugin=dsn)
+            values.dispatch(type_instance=devname,
+                            values=[all_bytes_read[k], all_bytes_write[k]])
     except:
         collectd.debug("cannot parse {0}".format(srcfile))
         pass
@@ -230,16 +241,18 @@ def collect_blkio(metric_root, dsn):
             all_ops_write = parse_writes(ops_lines)
         for k in all_bytes_read:
             devname = get_blkdev_name(k)
-            v = collectd.Values(plugin_instance="blkio", type="disk_ops",
-                                plugin=dsn)
-            v.dispatch(type_instance=devname,
-                       values=[all_ops_read[k], all_ops_write[k]])
+            values = collectd.Values(plugin_instance="blkio",
+                                     type="disk_ops",
+                                     plugin=dsn)
+            values.dispatch(type_instance=devname,
+                            values=[all_ops_read[k], all_ops_write[k]])
     except:
         collectd.debug("cannot parse {0}".format(srcfile))
         pass
 
 
 def read_callback(input_data=None):
+    '''Used every time collectd polls for data'''
     # Avoid doing expensive stuff below if there's nothing to collect
     if not collect_anything():
         return
@@ -251,11 +264,11 @@ def read_callback(input_data=None):
 
     metrics = dict()
 
-    #Get all stats by container group by user
-    rgxp = '/sys/fs/cgroup/'
-    rgxp += '(?P<type>[a-zA-Z_,]+)/'
-    rgxp += '(?:user/(?P<user_id>[0-9]+)\.user/[a-zA-Z0-9]+\.session/)?lxc/'
-    rgxp += '(?P<container_name>.*)/'
+    # Get all stats by container group by user
+    rgxp = r'/sys/fs/cgroup/'
+    rgxp += r'(?P<type>[a-zA-Z_,]+)/'
+    rgxp += r'(?:user/(?P<user_id>[0-9]+)\.user/[a-zA-Z0-9]+\.session/)?lxc/'
+    rgxp += r'(?P<container_name>.*)/'
     for cgroup_lxc_metrics in cgroup_lxc:
         m = re.search(rgxp, cgroup_lxc_metrics)
         user_id = int(m.group("user_id") or 0)
@@ -304,7 +317,7 @@ if __name__ == '__main__':
         def dispatch(self, **kwargs):
             values = self._values.copy()
             values.update(kwargs)
-            print(values)
+            print values
 
     import types
     collectd = types.ModuleType("collectd")
