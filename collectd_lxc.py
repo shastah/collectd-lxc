@@ -261,29 +261,30 @@ def read_callback(input_data=None):
                             byte_lines = f.read()
                             all_bytes_read = parse_reads(byte_lines)
                             all_bytes_write = parse_writes(byte_lines)
+                        for k in all_bytes_read:
+                            devname = get_blkdev_name(k)
+                            values = collectd.Values(plugin_instance="blkio", type="disk_octets", plugin=dsn)
+                            values.dispatch(type_instance=devname, values=[all_bytes_read[k], all_bytes_write[k]])
                     except:
                         collectd.debug("cannot parse {0}/{1}".format(metric_root,
                                                 'blkio.throttle.io_service_bytes'))
-                        continue
+                        pass
 
                     try:
                         with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
                             ops_lines = f.read()
                             all_ops_read = parse_reads(ops_lines)
                             all_ops_write = parse_writes(ops_lines)
+                        for k in all_bytes_read:
+                            devname = get_blkdev_name(k)
+                            values = collectd.Values(plugin_instance="blkio", type="disk_ops", plugin=dsn)
+                            values.dispatch(type_instance=devname, values=[all_ops_read[k], all_ops_write[k]])
                     except:
                         collectd.debug("cannot parse {0}/{1}".format(metric_root,
                                                 'blkio.throttle.io_serviced'))
-                        continue
+                        pass
 
-                    for k in all_bytes_read:
-                        devname = get_blkdev_name(k)
 
-                        values = collectd.Values(plugin_instance="blkio", type="disk_octets", plugin=dsn)
-                        values.dispatch(type_instance=devname, values=[all_bytes_read[k], all_bytes_write[k]])
-
-                        values = collectd.Values(plugin_instance="blkio", type="disk_ops", plugin=dsn)
-                        values.dispatch(type_instance=devname, values=[all_ops_read[k], all_ops_write[k]])
 
                 ### End DISK
 
