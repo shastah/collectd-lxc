@@ -93,7 +93,8 @@ def get_proc_net_dev_by_task_id(task_id):
             network_data = subprocess.check_output(['cat', '/proc/net/dev'])
             return network_data.split('\n')
     except:
-        collectd.debug("cannot get /proc/net/dev from netns for pid {0}".format(task_id))
+        collectd.debug("cannot get /proc/net/dev " + \
+                       "from netns for pid {0}".format(task_id))
         return None
 
 
@@ -133,22 +134,23 @@ def collect_net(metric_root, dsn):
         rx_errors = int(rx_data[2])
         tx_errors = int(tx_data[2])
 
-        values = collectd.Values(plugin_instance="net", type="if_octets",
+        v = collectd.Values(plugin_instance="net", type="if_octets",
                                  plugin=dsn)
-        values.dispatch(type_instance=iface, values=[rx_bytes, tx_bytes])
+        v.dispatch(type_instance=iface, values=[rx_bytes, tx_bytes])
 
-        values = collectd.Values(plugin_instance="net", type="if_packets",
+        v = collectd.Values(plugin_instance="net", type="if_packets",
                                  plugin=dsn)
-        values.dispatch(type_instance=iface, values=[rx_packets, tx_packets])
+        v.dispatch(type_instance=iface, values=[rx_packets, tx_packets])
 
-        values = collectd.Values(plugin_instance="net", type="if_errors",
+        v = collectd.Values(plugin_instance="net", type="if_errors",
                                  plugin=dsn)
-        values.dispatch(type_instance=iface, values=[rx_errors, tx_errors])
+        v.dispatch(type_instance=iface, values=[rx_errors, tx_errors])
     return
 
 
 def collect_cpu(metric_root, dsn):
-    with open(os.path.join(metric_root, 'cpuacct.stat'), 'r') as f:
+    srcfile = os.path.join(metric_root, 'cpuacct.stat')
+    with open(srcfile, 'r') as f:
         lines = f.read().splitlines()
 
     cpu_user = 0
@@ -161,13 +163,14 @@ def collect_cpu(metric_root, dsn):
         elif data[0] == "system":
             cpu_system = int(data[1])
 
-    values = collectd.Values(plugin_instance="cpu", type="cpu", plugin=dsn)
-    values.dispatch(type_instance="user", values=[cpu_user])
-    values.dispatch(type_instance="system", values=[cpu_system])
+    v = collectd.Values(plugin_instance="cpu", type="cpu", plugin=dsn)
+    v.dispatch(type_instance="user", values=[cpu_user])
+    v.dispatch(type_instance="system", values=[cpu_system])
 
 
 def collect_memory(metric_root, dsn):
-    with open(os.path.join(metric_root, 'memory.stat'), 'r') as f:
+    srcfile = os.path.join(metric_root, 'memory.stat')
+    with open(srcfile, 'r') as f:
         lines = f.read().splitlines()
 
     mem_rss = 0
@@ -183,16 +186,16 @@ def collect_memory(metric_root, dsn):
         elif data[0] == "total_swap":
             mem_swap = int(data[1])
 
-    values = collectd.Values(plugin_instance="memory", type="memory",
-                             plugin=dsn)
-    values.dispatch(type_instance="rss", values=[mem_rss])
-    values.dispatch(type_instance="cache", values=[mem_cache])
-    values.dispatch(type_instance="swap", values=[mem_swap])
+    v = collectd.Values(plugin_instance="memory", type="memory", plugin=dsn)
+    v.dispatch(type_instance="rss", values=[mem_rss])
+    v.dispatch(type_instance="cache", values=[mem_cache])
+    v.dispatch(type_instance="swap", values=[mem_swap])
 
 
 def collect_blkio(metric_root, dsn):
     rgxp = '^ (?P<dev> [0-9:]+ ) \s {0} \s (?P<val> [0-9]+ ) $'
-    re_templ = lambda kw: re.compile(rgxp.format(kw), flags=re.VERBOSE | re.MULTILINE)
+    re_templ = lambda kw: re.compile(rgxp.format(kw),
+                                     flags=re.VERBOSE | re.MULTILINE)
     def parse(regexp, s):
         d = {}
         intify = lambda (dev, val) : (dev, int(val))
@@ -203,32 +206,36 @@ def collect_blkio(metric_root, dsn):
     # write metrics are slightly irrelevant actually, because writes
     # are only accounted when they are not buffered. So meaningful
     # results are only obtained for direct/unbuffered IO.
+    srcfile = os.path.join(metric_root, 'blkio.throttle.io_service_bytes')
     try:
-        with open(os.path.join(metric_root, 'blkio.throttle.io_service_bytes'), 'r') as f:
+        with open(srcfile, 'r') as f:
             byte_lines = f.read()
             all_bytes_read = parse_reads(byte_lines)
             all_bytes_write = parse_writes(byte_lines)
         for k in all_bytes_read:
             devname = get_blkdev_name(k)
-            values = collectd.Values(plugin_instance="blkio", type="disk_octets", plugin=dsn)
-            values.dispatch(type_instance=devname, values=[all_bytes_read[k], all_bytes_write[k]])
+            v = collectd.Values(plugin_instance="blkio", type="disk_octets",
+                                plugin=dsn)
+            v.dispatch(type_instance=devname,
+                       values=[all_bytes_read[k], all_bytes_write[k]])
     except:
-        collectd.debug("cannot parse {0}/{1}".format(metric_root,
-                                'blkio.throttle.io_service_bytes'))
+        collectd.debug("cannot parse {0}".format(srcfile))
         pass
 
+    srcfile = os.path.join(metric_root, 'blkio.throttle.io_serviced')
     try:
-        with open(os.path.join(metric_root, 'blkio.throttle.io_serviced'), 'r') as f:
+        with open(srcfile, 'r') as f:
             ops_lines = f.read()
             all_ops_read = parse_reads(ops_lines)
             all_ops_write = parse_writes(ops_lines)
         for k in all_bytes_read:
             devname = get_blkdev_name(k)
-            values = collectd.Values(plugin_instance="blkio", type="disk_ops", plugin=dsn)
-            values.dispatch(type_instance=devname, values=[all_ops_read[k], all_ops_write[k]])
+            v = collectd.Values(plugin_instance="blkio", type="disk_ops",
+                                plugin=dsn)
+            v.dispatch(type_instance=devname,
+                       values=[all_ops_read[k], all_ops_write[k]])
     except:
-        collectd.debug("cannot parse {0}/{1}".format(metric_root,
-                                'blkio.throttle.io_serviced'))
+        collectd.debug("cannot parse {0}".format(srcfile))
         pass
 
 
@@ -245,8 +252,12 @@ def read_callback(input_data=None):
     metrics = dict()
 
     #Get all stats by container group by user
+    rgxp = '/sys/fs/cgroup/'
+    rgxp += '(?P<type>[a-zA-Z_,]+)/'
+    rgxp += '(?:user/(?P<user_id>[0-9]+)\.user/[a-zA-Z0-9]+\.session/)?lxc/'
+    rgxp += '(?P<container_name>.*)/'
     for cgroup_lxc_metrics in cgroup_lxc:
-        m = re.search("/sys/fs/cgroup/(?P<type>[a-zA-Z_,]+)/(?:user/(?P<user_id>[0-9]+)\.user/[a-zA-Z0-9]+\.session/)?lxc/(?P<container_name>.*)/", cgroup_lxc_metrics)
+        m = re.search(rgxp, cgroup_lxc_metrics)
         user_id = int(m.group("user_id") or 0)
         stat_type = m.group("type")
         container_name = m.group("container_name")
