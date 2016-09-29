@@ -15,7 +15,7 @@ CONFIG = { 'separator': '_',
          }
 
 
-def configer(cfg):
+def config_callback(cfg):
     collectd.info('Configuring lxc plugin')
     global CONFIG
     for node in cfg.children:
@@ -32,8 +32,8 @@ def configer(cfg):
         collectd.debug("Config: {0} = {1}".format(k, str(CONFIG[k])))
 
 
-def initer():
-    collectd.info('initing lxc collectd')
+def init_callback():
+    collectd.info('Initializing lxc plugin')
 
 
 def str_to_bool(s):
@@ -145,7 +145,7 @@ def dispatch_network_data(dsn, network_data):
     return
 
 
-def reader(input_data=None):
+def read_callback(input_data=None):
     # Avoid doing expensive stuff below if there's nothing to collect
     if not collect_anything():
         return
@@ -305,9 +305,9 @@ if __name__ == '__main__':
     collectd = types.ModuleType("collectd")
     collectd.Values = Values
 
-    reader()
+    read_callback()
 else:
     import collectd
-    collectd.register_config(configer)
-    collectd.register_init(initer)
-    collectd.register_read(reader)
+    collectd.register_config(config_callback)
+    collectd.register_init(init_callback)
+    collectd.register_read(read_callback)
