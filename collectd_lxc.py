@@ -208,7 +208,7 @@ def collect_blkio(metric_root, dsn):
                                      flags=re.VERBOSE | re.MULTILINE)
     def parse(regexp, s):
         d = {}
-        intify = lambda (dev, val): (dev, int(val))
+        intify = lambda dev_val: (dev_val[0], int(dev_val[1]))
         d.update(map(intify, regexp.findall(s)))
         return d
     parse_reads = lambda s: parse(re_templ("Read"), s)
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         def dispatch(self, **kwargs):
             values = self._values.copy()
             values.update(kwargs)
-            print values
+            print(values)
 
     import types
     collectd = types.ModuleType("collectd")
