@@ -27,7 +27,10 @@ def config_callback(cfg):
             CONFIG[key] = val
         elif key in ['collectblkio', 'collectcpu',
                      'collectmemory', 'collectnet']:
-            CONFIG[key] = str_to_bool(val[0])
+            if isinstance(val[0], bool):
+                CONFIG[key] = val[0]
+            else:
+                CONFIG[key] = str_to_bool(val[0])
     for key in CONFIG:
         collectd.debug("Config: {0} = {1}".format(key, str(CONFIG[key])))
 
