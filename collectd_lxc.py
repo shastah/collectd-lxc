@@ -311,6 +311,9 @@ def read_callback(input_data=None):
 
 
 if __name__ == '__main__':
+    # for commandline debugging
+    def print_to_stdout(string):
+        print(string)
     # Mimic Collectd Values object
     class Values(object):
         def __init__(self, **kwargs):
@@ -325,6 +328,7 @@ if __name__ == '__main__':
     import types
     collectd = types.ModuleType("collectd")
     collectd.Values = Values
+    collectd.info = print_to_stdout
 
     read_callback()
 else:
