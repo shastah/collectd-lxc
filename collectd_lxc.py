@@ -97,7 +97,7 @@ def get_proc_net_dev_by_task_id(task_id):
         with Namespace(task_id, 'net'):
             # To read network metric in namespace,
             # "open" method don't work with namespaces
-            network_data = subprocess.check_output(['cat', '/proc/net/dev'])
+            network_data = subprocess.check_output(['/bin/cat', '/proc/net/dev'])
             return network_data.split('\n')
     except:
         collectd.debug("cannot get /proc/net/dev " +
